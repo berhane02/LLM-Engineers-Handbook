@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     QDRANT_APIKEY: str | None = None
 
     # AWS Authentication
-    AWS_REGION: str = "eu-central-1"
+    AWS_REGION: str = "us-east-2"
     AWS_ACCESS_KEY: str | None = None
     AWS_SECRET_KEY: str | None = None
     AWS_ARN_ROLE: str | None = None
@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     GPUS: int = 1  # Number of GPUs
     CPUS: int = 2  # Number of CPU cores
 
-    SAGEMAKER_ENDPOINT_CONFIG_INFERENCE: str = "twin"
-    SAGEMAKER_ENDPOINT_INFERENCE: str = "twin"
+    SAGEMAKER_ENDPOINT_CONFIG_INFERENCE: str = "twin-endpoint-config"
+    SAGEMAKER_ENDPOINT_INFERENCE: str = "twin-endpoint"
     TEMPERATURE_INFERENCE: float = 0.01
     TOP_P_INFERENCE: float = 0.9
     MAX_NEW_TOKENS_INFERENCE: int = 150

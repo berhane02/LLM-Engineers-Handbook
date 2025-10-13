@@ -1,10 +1,37 @@
-accelerate==0.33.0
-torch==2.4.0
-transformers==4.43.3
-datasets==2.20.0
-peft==0.12.0
-trl==0.9.6
-bitsandbytes==0.43.3
+# =============================
+# RUNTIME INSTALLATION (installed during SageMaker job startup)
+# =============================
+# NOTE: Base Docker image already has (BAKED IN):
+#   - torch==2.4.1, torchvision==0.19.1, torchaudio==2.4.1
+#   - flash-attn==2.6.3.post1
+#   - bitsandbytes==0.44.1
+#   - triton==3.1.0
+#   - numpy==1.26.4
+#   - sentencepiece
+#   - sagemaker-training
+#
+# Only install packages NOT in the Docker image!
+
+# HuggingFace ecosystem (install at runtime - fast)
+transformers==4.48.0
+tokenizers>=0.21.0,<0.22.0
+huggingface-hub>=0.26.0,<1.0
+datasets>=3.0.1
+safetensors>=0.4.5
+
+# Training frameworks (install at runtime - fast)
+accelerate>=1.0.1
+peft==0.14.0
+trl==0.10.1
+
+# Utilities (lightweight, fast to install)
+tqdm
+rich>=13.3.2
+pydantic<2.0.0
+
+# Experiment tracking
 comet-ml==3.44.3
-flash-attn==2.3.6
-unsloth==2024.9.post2
+
+# Unsloth (must be last) - for 2-5x speedup
+# Installs at runtime (~3 minutes)
+unsloth[torch] @ git+https://github.com/unslothai/unsloth.git

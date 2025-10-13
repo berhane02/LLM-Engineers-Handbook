@@ -1,0 +1,20 @@
+# =============================
+# BUILD-TIME INSTALLATION (baked into Docker image)
+# =============================
+# Only critical packages that are slow to install
+
+# Core ML stack with CUDA (2.4.1 for better Unsloth compatibility)
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+
+# Flash Attention (takes 5-8 min to compile - bake in)
+flash-attn==2.6.3.post1
+
+# Optimization libraries
+bitsandbytes==0.44.1
+triton==3.1.0
+
+# Base utilities
+numpy==1.26.4
+sentencepiece

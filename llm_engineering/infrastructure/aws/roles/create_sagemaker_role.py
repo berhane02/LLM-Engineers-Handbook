@@ -12,6 +12,16 @@ from llm_engineering.settings import settings
 
 
 def create_sagemaker_user(username: str):
+    # Validate username format for AWS IAM constraints
+    import re
+
+    if not re.match(r"^[a-zA-Z0-9_+=,.@-]+$", username):
+        raise ValueError(
+            f"Username '{username}' contains invalid characters. AWS IAM usernames must match pattern: [a-zA-Z0-9_+=,.@-]+"
+        )
+    if len(username) > 64:
+        raise ValueError(f"Username '{username}' is too long. AWS IAM usernames must be 1-64 characters.")
+
     assert settings.AWS_REGION, "AWS_REGION is not set."
     assert settings.AWS_ACCESS_KEY, "AWS_ACCESS_KEY is not set."
     assert settings.AWS_SECRET_KEY, "AWS_SECRET_KEY is not set."

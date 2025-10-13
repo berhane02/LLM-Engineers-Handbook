@@ -2,9 +2,21 @@ import argparse
 import os
 from pathlib import Path
 
-from unsloth import PatchDPOTrainer
+# Try to import Unsloth - make it optional for Python 3.10 compatibility
+# Can be disabled with DISABLE_UNSLOTH=1 environment variable for compatibility
+UNSLOTH_AVAILABLE = False
+if os.environ.get("DISABLE_UNSLOTH", "0") != "1":
+    try:
+        from unsloth import PatchDPOTrainer
 
-PatchDPOTrainer()
+        PatchDPOTrainer()
+        UNSLOTH_AVAILABLE = True
+        print("Unsloth loaded successfully. Using Unsloth optimizations.")
+    except ImportError:
+        UNSLOTH_AVAILABLE = False
+        print("Warning: Unsloth not available. Training will proceed without Unsloth optimizations.")
+else:
+    print("Unsloth disabled via DISABLE_UNSLOTH environment variable. Using standard transformers.")
 
 from typing import Any, List, Literal, Optional  # noqa: E402
 
@@ -14,8 +26,18 @@ from huggingface_hub import HfApi  # noqa: E402
 from huggingface_hub.utils import RepositoryNotFoundError  # noqa: E402
 from transformers import TextStreamer, TrainingArguments  # noqa: E402
 from trl import DPOConfig, DPOTrainer, SFTTrainer  # noqa: E402
-from unsloth import FastLanguageModel, is_bfloat16_supported  # noqa: E402
-from unsloth.chat_templates import get_chat_template  # noqa: E402
+
+# Import Unsloth components if available
+if UNSLOTH_AVAILABLE:
+    from unsloth import FastLanguageModel, is_bfloat16_supported  # noqa: E402
+    from unsloth.chat_templates import get_chat_template  # noqa: E402
+else:
+    # Fallback to standard transformers
+    from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: E402
+
+    def is_bfloat16_supported():
+        return torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+
 
 alpaca_template = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
@@ -36,24 +58,71 @@ def load_model(
     target_modules: List[str],
     chat_template: str,
 ) -> tuple:
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name,
-        max_seq_length=max_seq_length,
-        load_in_4bit=load_in_4bit,
-    )
+    if UNSLOTH_AVAILABLE:
+        # Use Unsloth for optimized loading (2-5x faster training)
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=model_name,
+            max_seq_length=max_seq_length,
+            load_in_4bit=load_in_4bit,
+            dtype=None,  # Auto-detect optimal dtype (bfloat16 or float16)
+        )
 
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=lora_rank,
-        lora_alpha=lora_alpha,
-        lora_dropout=lora_dropout,
-        target_modules=target_modules,
-    )
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=target_modules,
+            use_gradient_checkpointing="unsloth",  # Use Unsloth's optimized checkpointing
+            use_rslora=False,  # Use standard LoRA (not rank-stabilized)
+            loftq_config=None,  # No LoftQ quantization
+        )
 
-    tokenizer = get_chat_template(
-        tokenizer,
-        chat_template=chat_template,
-    )
+        tokenizer = get_chat_template(
+            tokenizer,
+            chat_template=chat_template,
+        )
+    else:
+        # Use standard transformers + PEFT
+        from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+        from transformers import BitsAndBytesConfig
+
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "right"
+
+        # Configure quantization if needed
+        if load_in_4bit:
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16 if is_bfloat16_supported() else torch.float16,
+                bnb_4bit_use_double_quant=True,
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                quantization_config=bnb_config,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            model = prepare_model_for_kbit_training(model)
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+
+        # Apply LoRA
+        peft_config = LoraConfig(
+            r=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=target_modules,
+            task_type="CAUSAL_LM",
+        )
+        model = get_peft_model(model, peft_config)
 
     return model, tokenizer
 
@@ -142,7 +211,8 @@ def finetune(
             ),
         )
     elif finetuning_type == "dpo":
-        PatchDPOTrainer()
+        if UNSLOTH_AVAILABLE:
+            PatchDPOTrainer()
 
         def format_samples_dpo(example):
             example["prompt"] = alpaca_template.format(example["prompt"], "")
@@ -207,7 +277,11 @@ def inference(
     prompt: str = "Write a paragraph to introduce supervised fine-tuning.",
     max_new_tokens: int = 256,
 ) -> None:
-    model = FastLanguageModel.for_inference(model)
+    if UNSLOTH_AVAILABLE:
+        model = FastLanguageModel.for_inference(model)
+    else:
+        model.eval()
+
     message = alpaca_template.format(prompt, "")
     inputs = tokenizer([message], return_tensors="pt").to("cuda")
 
@@ -216,11 +290,20 @@ def inference(
 
 
 def save_model(model: Any, tokenizer: Any, output_dir: str, push_to_hub: bool = False, repo_id: Optional[str] = None):
-    model.save_pretrained_merged(output_dir, tokenizer, save_method="merged_16bit")
-
-    if push_to_hub and repo_id:
-        print(f"Saving model to '{repo_id}'")  # noqa
-        model.push_to_hub_merged(repo_id, tokenizer, save_method="merged_16bit")
+    if UNSLOTH_AVAILABLE:
+        # Use Unsloth's optimized save method
+        model.save_pretrained_merged(output_dir, tokenizer, save_method="merged_16bit")
+        if push_to_hub and repo_id:
+            print(f"Saving model to '{repo_id}'")  # noqa
+            model.push_to_hub_merged(repo_id, tokenizer, save_method="merged_16bit")
+    else:
+        # Use standard PEFT save method
+        model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
+        if push_to_hub and repo_id:
+            print(f"Saving model to '{repo_id}'")  # noqa
+            model.push_to_hub(repo_id)
+            tokenizer.push_to_hub(repo_id)
 
 
 def check_if_huggingface_model_exists(model_id: str, default_value: str = "mlabonne/TwinLlama-3.1-8B") -> str:
