@@ -65,6 +65,7 @@ def load_model(
             max_seq_length=max_seq_length,
             load_in_4bit=load_in_4bit,
             dtype=None,  # Auto-detect optimal dtype (bfloat16 or float16)
+            device_map="auto",  # Proper device mapping for meta tensor handling
         )
 
         model = FastLanguageModel.get_peft_model(
@@ -105,6 +106,7 @@ def load_model(
                 quantization_config=bnb_config,
                 device_map="auto",
                 trust_remote_code=True,
+                torch_dtype=torch.bfloat16 if is_bfloat16_supported() else torch.float16,
             )
             model = prepare_model_for_kbit_training(model)
         else:
@@ -112,6 +114,7 @@ def load_model(
                 model_name,
                 device_map="auto",
                 trust_remote_code=True,
+                torch_dtype=torch.bfloat16 if is_bfloat16_supported() else torch.float16,
             )
 
         # Apply LoRA

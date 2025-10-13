@@ -1,14 +1,14 @@
 # =============================
-# Stage 1: Builder (compile heavy packages)
+# Stage 1: Builder (optional heavy packages compilation)
 # =============================
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS builder
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV PYTHONUNBUFFERED=1
 
-# Install basic build tools and Python 3.10
+# Install Python 3.10 + build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3-pip python3-venv \
     build-essential git cmake ninja-build curl libffi-dev libssl-dev \
@@ -21,26 +21,16 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel packaging ninja
 
-# =============================
-# Install heavy Python packages
-# =============================
-RUN pip install --no-cache-dir \
-    torch==2.4.1 \
-    torchvision==0.15.2 \
-    torchaudio==2.4.1 \
-    --index-url https://download.pytorch.org/whl/cu121
+# Copy requirements
+COPY requirements.txt /tmp/requirements.txt
 
-RUN pip install --no-cache-dir \
-    flash-attn==2.6.1 \
-    bitsandbytes==0.44.1 \
-    triton==3.1.0 \
-    numpy==1.26.4 \
-    sentencepiece
+# Install all packages from requirements
+RUN pip install --no-cache-dir -r /tmp/requirements.txt || true
 
 # =============================
 # Stage 2: Runtime image
 # =============================
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -60,28 +50,24 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy heavy packages from builder stage
+# Copy installed packages from builder stage
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Suppress pip root warning
+# Suppress pip root user warning
 ENV PIP_ROOT_USER_ACTION=ignore
 
-# SageMaker env
+# SageMaker environment
 ENV SAGEMAKER_PROGRAM=finetune.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
 ENV SAGEMAKER_REGION=us-east-2
 
-# SageMaker directories
 RUN mkdir -p /opt/ml/code /opt/ml/model /opt/ml/output/data /opt/ml/input
 WORKDIR /opt/ml/code
 ENV PATH="/opt/ml/code:${PATH}"
 
-# =============================
-# Runtime packages installed at SageMaker job start
-# =============================
-COPY requirements_runtime.txt /tmp/requirements_runtime.txt
-RUN pip install --no-cache-dir -r /tmp/requirements_runtime.txt
+# Copy code (your training scripts)
+COPY . /opt/ml/code
 
 # Default entrypoint for SageMaker training
 ENTRYPOINT ["train"]

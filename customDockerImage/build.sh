@@ -24,7 +24,7 @@ while [[ "$1" == --* ]]; do
 done
 
 # Default values
-IMAGE_NAME=${1:-"llm-training-python310"}
+IMAGE_NAME=${1:-"llm-training-torch"}
 IMAGE_TAG=${2:-"latest"}
 
 echo "================================================"

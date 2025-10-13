@@ -1,6 +1,6 @@
 settings:
   docker:
-    parent_image: 767398029096.dkr.ecr.us-east-2.amazonaws.com/llm-training-python310:latest
+    parent_image: 767398029096.dkr.ecr.us-east-2.amazonaws.com/llm-training-torch:latest
     skip_build: True
   orchestrator.sagemaker:
     synchronous: false
