@@ -1,47 +1,46 @@
 # =============================
-# Stage 1: Build / compile stage
+# Stage 1: Builder (compile heavy packages)
 # =============================
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS builder
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies for build
+# Install basic build tools and Python 3.10
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 python3.10-dev python3.10-venv python3-pip \
-    build-essential git cmake ninja-build curl libffi-dev libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
+    python3.10 python3.10-dev python3-pip python3-venv \
+    build-essential git cmake ninja-build curl libffi-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set python3.10 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+# Set Python 3.10 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel packaging ninja
 
-# Copy build-time requirements
-COPY requirements.txt /tmp/requirements.txt
-
-# Install PyTorch 2.4.1 (better Unsloth compatibility than 2.5.1)
-RUN pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 \
+# =============================
+# Install heavy Python packages
+# =============================
+RUN pip install --no-cache-dir \
+    torch==2.4.1 \
+    torchvision==0.15.2 \
+    torchaudio==2.4.1 \
     --index-url https://download.pytorch.org/whl/cu121
 
-# Build flash-attn as wheel (compilation happens here)
-RUN pip install flash-attn==2.6.3.post1 --no-build-isolation || \
-    echo "Flash Attention build failed - continuing without it"
-
-# Install remaining build-time packages
-RUN pip install --no-cache-dir -r /tmp/requirements.txt || true
-
-# Install SageMaker Training Toolkit in builder stage (needs build tools)
-RUN pip install sagemaker-training
+RUN pip install --no-cache-dir \
+    flash-attn==2.6.1 \
+    bitsandbytes==0.44.1 \
+    triton==3.1.0 \
+    numpy==1.26.4 \
+    sentencepiece
 
 # =============================
-# Stage 2: Runtime / final image
+# Stage 2: Runtime image
 # =============================
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -49,41 +48,40 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-# Install minimal runtime dependencies (no build tools)
+# Minimal runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 python3-pip git curl ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+    python3.10 python3-pip git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set python3.10 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+# Set Python 3.10 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy installed packages from builder stage (includes sagemaker-training)
+# Copy heavy packages from builder stage
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Suppress pip root user warning (Docker containers run as root by default)
+# Suppress pip root warning
 ENV PIP_ROOT_USER_ACTION=ignore
 
-# SageMaker-specific environment variables
+# SageMaker env
 ENV SAGEMAKER_PROGRAM=finetune.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
 ENV SAGEMAKER_REGION=us-east-2
 
-# Create SageMaker directories
+# SageMaker directories
 RUN mkdir -p /opt/ml/code /opt/ml/model /opt/ml/output/data /opt/ml/input
-
-# Set working directory
 WORKDIR /opt/ml/code
-
-# Clean up to reduce final image size
-RUN rm -rf /root/.cache /tmp/* /var/tmp/*
-
-# Default PATH for SageMaker
 ENV PATH="/opt/ml/code:${PATH}"
 
-# Use SageMaker Training Toolkit's train entrypoint for script mode
+# =============================
+# Runtime packages installed at SageMaker job start
+# =============================
+COPY requirements_runtime.txt /tmp/requirements_runtime.txt
+RUN pip install --no-cache-dir -r /tmp/requirements_runtime.txt
+
+# Default entrypoint for SageMaker training
 ENTRYPOINT ["train"]

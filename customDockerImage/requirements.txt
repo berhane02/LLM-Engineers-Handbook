@@ -13,8 +13,6 @@ flash-attn==2.6.3.post1
 
 # Optimization libraries
 bitsandbytes==0.44.1
-triton==3.1.0
 
 # Base utilities
-numpy==1.26.4
 sentencepiece

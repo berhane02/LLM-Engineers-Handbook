@@ -13,25 +13,29 @@
 # Only install packages NOT in the Docker image!
 
 # HuggingFace ecosystem (install at runtime - fast)
-transformers==4.48.0
+# Runtime packages installed at SageMaker job startup
+# =============================
+# =============================
+# Runtime installation (SageMaker job startup)
+# =============================
+
+# HuggingFace / LLM frameworks
+transformers>=4.48.0,<4.55.0
 tokenizers>=0.21.0,<0.22.0
-huggingface-hub>=0.26.0,<1.0
+huggingface_hub==0.26.0
 datasets>=3.0.1
 safetensors>=0.4.5
 
-# Training frameworks (install at runtime - fast)
-accelerate>=1.0.1
+# Training frameworks
+accelerate>=1.4.0
 peft==0.14.0
-trl==0.10.1
+trl==0.22.2
 
-# Utilities (lightweight, fast to install)
+# Experiment tracking / utilities
+comet-ml==3.44.3
 tqdm
 rich>=13.3.2
 pydantic<2.0.0
 
-# Experiment tracking
-comet-ml==3.44.3
-
-# Unsloth (must be last) - for 2-5x speedup
-# Installs at runtime (~3 minutes)
+# Unsloth (must be last for best performance)
 unsloth[torch] @ git+https://github.com/unslothai/unsloth.git
