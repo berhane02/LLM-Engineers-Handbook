@@ -7,7 +7,7 @@ set -e
 
 # Default values
 IMAGE_NAME=${1:-"llm-training-python310"}
-IMAGE_TAG=${2:-"latest"}
+IMAGE_TAG=${2:-"v$(date +%Y%m%d-%H%M%S)"}  # Auto-generate timestamp tag
 AWS_REGION=${3:-"us-east-2"}
 
 echo "================================================"

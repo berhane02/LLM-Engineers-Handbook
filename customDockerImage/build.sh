@@ -25,7 +25,7 @@ done
 
 # Default values
 IMAGE_NAME=${1:-"llm-training-torch"}
-IMAGE_TAG=${2:-"latest"}
+IMAGE_TAG=${2:-"v$(date +%Y%m%d-%H%M%S)"}  # Auto-generate timestamp tag
 
 echo "================================================"
 echo "Building Custom LLM Training Docker Image"
@@ -40,14 +40,21 @@ else
 fi
 echo "================================================"
 
-# Build the Docker image
+# Build the Docker image from project root
 echo "Building Docker image..."
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
+
+# Add build args for cache busting
+BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+BUILD_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
 docker build \
     $NO_CACHE \
     --platform linux/amd64 \
+    --build-arg BUILD_DATE="$BUILD_DATE" \
+    --build-arg BUILD_VERSION="$BUILD_VERSION" \
     -t $IMAGE_NAME:$IMAGE_TAG \
-    -f Dockerfile \
+    -f customDockerImage/Dockerfile \
     .
 
 echo "================================================"

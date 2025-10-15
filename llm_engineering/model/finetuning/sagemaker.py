@@ -10,17 +10,19 @@ except ModuleNotFoundError:
     logger.warning("Couldn't load SageMaker imports. Run 'poetry install --with aws' to support AWS.")
 
 from llm_engineering.settings import settings
+from zenml.client import Client
 
 finetuning_dir = Path(__file__).resolve().parent
 
 # Note: SageMaker will automatically install requirements.txt from finetuning_dir
-# The base Docker image has (BAKED IN):
-#   - PyTorch 2.4.1 + CUDA 12.1
-#   - Flash Attention 2.6.3 (compiled)
-#   - bitsandbytes, triton, numpy, sentencepiece
+# Using Docker image from config (training.yaml) with (BAKED IN):
+#   - PyTorch 2.2.0 + CUDA 12.1
+#   - Python 3.10
 #   - SageMaker Training Toolkit
+#   - All CUDA libraries (Flash Attention compiled)
+#   - transformers, tokenizers, huggingface-hub, numpy, accelerate, datasets, etc.
 # Runtime installation (from requirements.txt):
-#   - Transformers, Unsloth, PEFT, TRL, datasets, etc.
+#   - Only missing packages: sentencepiece, peft, trl, rich, pydantic, comet-ml, unsloth
 
 
 def run_finetuning_on_sagemaker(
@@ -42,13 +44,18 @@ def run_finetuning_on_sagemaker(
     huggingface_user = user_info["name"]
     logger.info(f"Current Hugging Face user: {huggingface_user}")
 
-    # Get AWS account ID for custom image URI
-    sts = boto3.client("sts", region_name=settings.AWS_REGION)
-    aws_account_id = sts.get_caller_identity()["Account"]
-
-    # Custom Docker image URI
-    image_uri = f"{aws_account_id}.dkr.ecr.{settings.AWS_REGION}.amazonaws.com/llm-training-python310:latest"
-    logger.info(f"Using custom Docker image: {image_uri}")
+    # Use AWS public SageMaker PyTorch image from ZenML config
+    # PyTorch 2.2.0 + Python 3.10 + CUDA 12.1
+    try:
+        # Get Docker parent image from ZenML configuration
+        zenml_client = Client()
+        docker_config = zenml_client.active_stack.components.get("docker")
+        image_uri = docker_config.configuration.parent_image
+        logger.info(f"Using Docker image from ZenML config: {image_uri}")
+    except Exception as e:
+        # Fallback to hardcoded image if ZenML config fails
+        image_uri = "763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-training:2.2.0-gpu-py310-cu121-ubuntu20.04-sagemaker"
+        logger.warning(f"Failed to get image from ZenML config ({e}), using fallback: {image_uri}")
 
     hyperparameters = {
         "finetuning_type": finetuning_type,
@@ -61,12 +68,12 @@ def run_finetuning_on_sagemaker(
     if is_dummy:
         hyperparameters["is_dummy"] = True
 
-    # Create SageMaker estimator with custom Docker image
-    # Using custom image with:
-    #   - Python 3.10 + PyTorch 2.4.1 + CUDA 12.1
-    #   - Unsloth for 2-5x faster training
-    #   - Flash Attention for optimized attention
-    #   - 4-bit quantization support
+    # Create SageMaker estimator with Docker image from config
+    # Using image from training.yaml with:
+    #   - Python 3.10 + PyTorch 2.2.0 + CUDA 12.1
+    #   - All CUDA libraries (Flash Attention compiled)
+    #   - SageMaker Training Toolkit
+    #   - Most ML packages pre-installed
     # SageMaker will automatically install requirements.txt from source_dir at runtime
     estimator = Estimator(
         image_uri=image_uri,
@@ -88,7 +95,7 @@ def run_finetuning_on_sagemaker(
     )
 
     # Start the training job on SageMaker
-    logger.info("Starting SageMaker training job with custom Docker image...")
+    logger.info("Starting SageMaker training job with Docker image from config...")
     estimator.fit()
 
 
