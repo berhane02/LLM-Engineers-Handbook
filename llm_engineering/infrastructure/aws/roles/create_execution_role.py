@@ -12,6 +12,16 @@ from llm_engineering.settings import settings
 
 
 def create_sagemaker_execution_role(role_name: str):
+    # Validate role name format for AWS IAM constraints
+    import re
+
+    if not re.match(r"^[a-zA-Z0-9_+=,.@-]+$", role_name):
+        raise ValueError(
+            f"Role name '{role_name}' contains invalid characters. AWS IAM role names must match pattern: [a-zA-Z0-9_+=,.@-]+"
+        )
+    if len(role_name) > 64:
+        raise ValueError(f"Role name '{role_name}' is too long. AWS IAM role names must be 1-64 characters.")
+
     assert settings.AWS_REGION, "AWS_REGION is not set."
     assert settings.AWS_ACCESS_KEY, "AWS_ACCESS_KEY is not set."
     assert settings.AWS_SECRET_KEY, "AWS_SECRET_KEY is not set."

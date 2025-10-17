@@ -307,7 +307,7 @@ For your AWS set-up to work correctly, you need the AWS CLI installed on your lo
 Chapter 2 provides step-by-step instructions on how to install the AWS CLI, create an admin user on AWS, and get an access key to set up the `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` environment variables. If you already have an AWS admin user in place, you have to configure the following env vars in your `.env` file:
 
 ```bash
-AWS_REGION=eu-central-1 # Change it with your AWS region.
+AWS_REGION=us-east-2 # Change it with your AWS region.
 AWS_ACCESS_KEY=your_aws_access_key
 AWS_SECRET_KEY=your_aws_secret_key
 ```
