@@ -169,15 +169,37 @@ def check_if_huggingface_model_exists(model_id: str, default_value: str) -> str:
     api = HfApi()
 
     try:
-        api.model_info(model_id)
+        model_info = api.model_info(model_id)
         print(f"Found model on HF: '{model_id}'.")  # noqa
+
+        # Check if model has LoRA adapters only (without full weights)
+        file_names = [file.rfilename for file in model_info.siblings]
+        has_adapter = any("adapter_model" in f for f in file_names)
+        has_full_weights = any(f.startswith("model-") or f == "pytorch_model.bin" for f in file_names)
+
+        if has_adapter and not has_full_weights:
+            print(f"Model '{model_id}' has LoRA adapters only, not full weights.")  # noqa
+            print(f"vLLM cannot load LoRA-only models.")  # noqa
+            print(f"Defaulting to '{default_value}' for vLLM compatibility.")  # noqa
+            return default_value
+
+        # Additional check: try to load the model config to ensure vLLM compatibility
+        try:
+            from transformers import AutoConfig
+
+            AutoConfig.from_pretrained(model_id, trust_remote_code=True)
+            print(f"Model config loaded successfully for '{model_id}'.")  # noqa
+            return model_id
+        except Exception as config_error:
+            print(f"Model '{model_id}' exists but has config issues: {config_error}")  # noqa
+            print(f"Defaulting to '{default_value}' for vLLM compatibility.")  # noqa
+            return default_value
+
     except RepositoryNotFoundError:
         print(f"Model '{model_id}' does not exist.")  # noqa
-        model_id = default_value
-        print(f"Defaulting to '{model_id}'")  # noqa
+        print(f"Defaulting to '{default_value}'")  # noqa
         print("Train your own model to avoid this behavior.")  # noqa
-
-    return model_id
+        return default_value
 
 
 def check_if_huggingface_dataset_exists(dataset_id: str, default_value: str) -> str:
@@ -197,10 +219,10 @@ def check_if_huggingface_dataset_exists(dataset_id: str, default_value: str) -> 
 
 model_ids = [
     check_if_huggingface_model_exists(
-        f"{MODEL_HUGGINGFACE_WORKSPACE}/TwinLlama-3.1-8B", default_value="mlabonne/TwinLlama-3.1-8B"
+        f"{MODEL_HUGGINGFACE_WORKSPACE}/TwinLlama-3.1-8B", default_value="meta-llama/Llama-3.1-8B-Instruct"
     ),
     check_if_huggingface_model_exists(
-        f"{MODEL_HUGGINGFACE_WORKSPACE}/TwinLlama-3.1-8B-DPO", default_value="mlabonne/TwinLlama-3.1-8B-DPO"
+        f"{MODEL_HUGGINGFACE_WORKSPACE}/TwinLlama-3.1-8B-DPO", default_value="meta-llama/Llama-3.1-8B-Instruct"
     ),
     "meta-llama/Llama-3.1-8B-Instruct",
 ]
