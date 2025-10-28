@@ -39,13 +39,15 @@ def run_evaluation_on_sagemaker(is_dummy: bool = True) -> None:
         env["IS_DUMMY"] = "True"
 
     # Initialize the HuggingFaceProcessor
+    # Specify transformers_version to select the container - this doesn't install transformers,
+    # it just selects which SageMaker HuggingFace container to use (transformers is already baked in)
     hfp = HuggingFaceProcessor(
         role=settings.AWS_ARN_ROLE,
         instance_count=1,
         instance_type="ml.g5.2xlarge",
-        transformers_version="4.36",
-        pytorch_version="2.1",
-        py_version="py310",
+        transformers_version="4.36",  # Selects container version - transformers is already baked in
+        pytorch_version="2.1",  # Selects container version - pytorch is already baked in
+        py_version="py310",  # Selects container version - python is already baked in
         base_job_name="evaluate-llm-twin",
         env=env,
     )

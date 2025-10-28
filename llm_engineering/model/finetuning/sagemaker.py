@@ -5,12 +5,12 @@ from loguru import logger
 
 try:
     from sagemaker.estimator import Estimator
-    import boto3
 except ModuleNotFoundError:
     logger.warning("Couldn't load SageMaker imports. Run 'poetry install --with aws' to support AWS.")
 
-from llm_engineering.settings import settings
 from zenml.client import Client
+
+from llm_engineering.settings import settings
 
 finetuning_dir = Path(__file__).resolve().parent
 
@@ -54,7 +54,9 @@ def run_finetuning_on_sagemaker(
         logger.info(f"Using Docker image from ZenML config: {image_uri}")
     except Exception as e:
         # Fallback to hardcoded image if ZenML config fails
-        image_uri = "763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-training:2.2.0-gpu-py310-cu121-ubuntu20.04-sagemaker"
+        image_uri = (
+            "763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-training:2.2.0-gpu-py310-cu121-ubuntu20.04-sagemaker"
+        )
         logger.warning(f"Failed to get image from ZenML config ({e}), using fallback: {image_uri}")
 
     hyperparameters = {

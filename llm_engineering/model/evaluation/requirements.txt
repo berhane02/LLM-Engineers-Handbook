@@ -1,5 +1,7 @@
-transformers==4.43.3
-datasets==2.20.0
+# Evaluation requirements - only packages NOT in SageMaker HuggingFace container
+# Container comes with: transformers, torch, tokenizers, huggingface-hub, numpy, scipy, 
+#                       pandas, tqdm, safetensors, accelerate, datasets
+
+# Evaluation-specific packages
 vllm==0.6.1.post2
-tqdm==4.66.4
-openai==1.55.3
+openai>=1.55.3

@@ -3,7 +3,9 @@ target-version = "py311"
 extend-exclude = [
     ".github",
     "graphql_client",
-    "graphql_schemas"
+    "graphql_schemas",
+    "llm_engineering/model/finetuning/finetune.py",  # Has intentional print statements for SageMaker debugging
+    "tools/"  # Exclude tool scripts from linting
 ]
 
 [lint]

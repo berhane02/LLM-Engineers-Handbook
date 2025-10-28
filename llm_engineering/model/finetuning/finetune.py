@@ -62,6 +62,7 @@ try:
         try:
             print("Attempting to import Unsloth...")
             from unsloth import PatchDPOTrainer
+
             print("Unsloth imported successfully. Applying patches...")
             PatchDPOTrainer()
             UNSLOTH_AVAILABLE = True
@@ -71,7 +72,9 @@ try:
             print(f"⚠️  Warning: Unsloth not available ({e}). Training will proceed without Unsloth optimizations.")
         except Exception as e:
             UNSLOTH_AVAILABLE = False
-            print(f"⚠️  Warning: Unsloth failed to initialize ({e}). Training will proceed without Unsloth optimizations.")
+            print(
+                f"⚠️  Warning: Unsloth failed to initialize ({e}). Training will proceed without Unsloth optimizations."
+            )
     else:
         print("Unsloth disabled via DISABLE_UNSLOTH environment variable. Using standard transformers.")
     print("✅ Step 3: Unsloth check completed")
@@ -86,6 +89,7 @@ from typing import Any, List, Literal, Optional  # noqa: E402
 try:
     print("✅ Step 4: Starting PyTorch import...")
     import torch  # noqa
+
     print("✅ Step 4: PyTorch imported successfully")
 except Exception as e:
     print(f"❌ Step 4 failed (PyTorch import): {e}")
@@ -116,26 +120,30 @@ try:
     print("=" * 60)
     print("IMPORTING CORE DEPENDENCIES")
     print("=" * 60)
-    
+
     print("Importing datasets...")
     from datasets import concatenate_datasets, load_dataset  # noqa: E402
+
     print("✅ datasets imported successfully")
-    
+
     print("Importing huggingface_hub...")
     from huggingface_hub import HfApi  # noqa: E402
     from huggingface_hub.utils import RepositoryNotFoundError  # noqa: E402
+
     print("✅ huggingface_hub imported successfully")
-    
+
     print("Importing transformers...")
     from transformers import TextStreamer, TrainingArguments  # noqa: E402
+
     print("✅ transformers imported successfully")
-    
+
     print("Importing trl...")
     from trl import DPOConfig, DPOTrainer, SFTTrainer  # noqa: E402
+
     print("✅ trl imported successfully")
-    
+
     print("✅ Step 5: Core dependencies imported successfully")
-    
+
 except Exception as e:
     print(f"❌ Step 5 failed (Core dependencies import): {e}")
     traceback.print_exc()
@@ -150,6 +158,7 @@ try:
             print("Importing Unsloth components...")
             from unsloth import FastLanguageModel, is_bfloat16_supported  # noqa: E402
             from unsloth.chat_templates import get_chat_template  # noqa: E402
+
             print("✅ Unsloth components imported successfully")
         except Exception as e:
             print(f"❌ Error importing Unsloth components: {e}")
@@ -160,6 +169,7 @@ try:
         try:
             print("Importing standard transformers components...")
             from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: E402
+
             print("✅ Standard transformers components imported successfully")
 
             def is_bfloat16_supported():
@@ -419,19 +429,47 @@ def inference(
 
 def save_model(model: Any, tokenizer: Any, output_dir: str, push_to_hub: bool = False, repo_id: Optional[str] = None):
     if UNSLOTH_AVAILABLE:
-        # Use Unsloth's optimized save method
-        model.save_pretrained_merged(output_dir, tokenizer, save_method="merged_16bit")
+        # Use Unsloth's optimized save method - push directly to Hub without saving locally
         if push_to_hub and repo_id:
-            print(f"Saving model to '{repo_id}'")  # noqa
-            model.push_to_hub_merged(repo_id, tokenizer, save_method="merged_16bit")
+            print(f"Pushing merged model directly to HuggingFace: '{repo_id}'")  # noqa
+            try:
+                model.push_to_hub_merged(repo_id, tokenizer, save_method="merged_16bit")
+                print(f"✅ Successfully pushed merged model to '{repo_id}'")  # noqa
+            except Exception as e:
+                print(f"❌ Warning: Failed to push merged model to HuggingFace: {e}")  # noqa
+                print(f"Falling back to cheapest local save...")  # noqa
+                model.save_pretrained_merged(output_dir, tokenizer, save_method="merged_16bit")
+                print(f"Local merged model saved at '{output_dir}'")  # noqa
+                print("You can manually upload it later.")  # noqa
+        else:
+            # Only save locally if not pushing to Hub
+            print(f"Saving merged model locally to '{output_dir}'...")  # noqa
+            model.save_pretrained_merged(output_dir, tokenizer, save_method="merged_16bit")
     else:
-        # Use standard PEFT save method
-        model.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
+        # Use standard PEFT save method - merge first if it's a LoRA model
+        # Check if this is a PEFT/LoRA model and merge it first
+        if hasattr(model, "merge_and_unload"):
+            print("Merging LoRA adapters before uploading...")  # noqa
+            model = model.merge_and_unload()
+
         if push_to_hub and repo_id:
-            print(f"Saving model to '{repo_id}'")  # noqa
-            model.push_to_hub(repo_id)
-            tokenizer.push_to_hub(repo_id)
+            print(f"Pushing merged model directly to HuggingFace: '{repo_id}'")  # noqa
+            try:
+                model.push_to_hub(repo_id, safe_serialization=True)
+                tokenizer.push_to_hub(repo_id)
+                print(f"✅ Successfully pushed merged model to '{repo_id}'")  # noqa
+            except Exception as e:
+                print(f"❌ Warning: Failed to push merged model to HuggingFace: {e}")  # noqa
+                print(f"Falling back to local save...")  # noqa
+                model.save_pretrained(output_dir, safe_serialization=True)
+                tokenizer.save_pretrained(output_dir)
+                print(f"Local merged model saved at '{output_dir}'")  # noqa
+                print("You can manually upload it later.")  # noqa
+        else:
+            # Only save locally if not pushing to Hub
+            print(f"Saving model locally to '{output_dir}'...")  # noqa
+            model.save_pretrained(output_dir, safe_serialization=True)
+            tokenizer.save_pretrained(output_dir)
 
 
 def check_if_huggingface_model_exists(model_id: str, default_value: str = "mlabonne/TwinLlama-3.1-8B") -> str:
@@ -453,7 +491,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print("STARTING TRAINING SCRIPT")
         print("=" * 60)
-        
+
         parser = argparse.ArgumentParser()
 
         parser.add_argument("--num_train_epochs", type=int, default=3)
@@ -475,7 +513,7 @@ if __name__ == "__main__":
         parser.add_argument("--n_gpus", type=str, default=os.environ["SM_NUM_GPUS"])
 
         args = parser.parse_args()
-        
+
         print(f"Arguments parsed successfully:")
         print(f"  finetuning_type: {args.finetuning_type}")
         print(f"  num_train_epochs: {args.num_train_epochs}")
@@ -539,11 +577,11 @@ if __name__ == "__main__":
 
             dpo_output_model_repo_id = f"{args.model_output_huggingface_workspace}/TwinLlama-3.1-8B-DPO"
             save_model(model, tokenizer, "model_dpo", push_to_hub=True, repo_id=dpo_output_model_repo_id)
-        
+
         print("=" * 60)
         print("TRAINING COMPLETED SUCCESSFULLY!")
         print("=" * 60)
-        
+
     except Exception as e:
         print("=" * 60)
         print("TRAINING FAILED WITH ERROR:")
