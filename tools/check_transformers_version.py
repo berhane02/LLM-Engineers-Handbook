@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check transformers version from model config."""
 
-from huggingface_hub import hf_hub_download
 import json
+
+from huggingface_hub import hf_hub_download
 from loguru import logger
 
 from llm_engineering import settings

@@ -3,9 +3,10 @@
 Test if tokenizer can be loaded from HuggingFace model.
 """
 
-from transformers import AutoTokenizer
-from loguru import logger
 import sys
+
+from loguru import logger
+from transformers import AutoTokenizer
 
 from llm_engineering import settings
 

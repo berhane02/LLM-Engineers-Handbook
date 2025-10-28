@@ -4,11 +4,12 @@ Helper script to merge LoRA adapters with base model and upload the full model t
 This creates a model that vLLM can load directly without needing LoRA adapters.
 """
 
+import shutil
 import sys
 from pathlib import Path
-from huggingface_hub import HfApi, snapshot_download, upload_file, upload_folder
+
+from huggingface_hub import HfApi, snapshot_download
 from loguru import logger
-import shutil
 
 from llm_engineering import settings
 

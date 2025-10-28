@@ -5,12 +5,12 @@ from loguru import logger
 
 try:
     from sagemaker.estimator import Estimator
-    import boto3
 except ModuleNotFoundError:
     logger.warning("Couldn't load SageMaker imports. Run 'poetry install --with aws' to support AWS.")
 
-from llm_engineering.settings import settings
 from zenml.client import Client
+
+from llm_engineering.settings import settings
 
 finetuning_dir = Path(__file__).resolve().parent
 

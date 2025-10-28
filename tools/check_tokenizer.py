@@ -3,9 +3,10 @@
 Check tokenizer files in HuggingFace model.
 """
 
+import sys
+
 from huggingface_hub import HfApi
 from loguru import logger
-import sys
 
 from llm_engineering import settings
 
@@ -56,7 +57,7 @@ def main():
             logger.info(f"  ✓ {file}")
 
         logger.info("\nModel weight files:")
-        weight_files = [f for f in files if any(ext in f for ext in [".safetensors", ".bin"]) and not "adapter" in f]
+        weight_files = [f for f in files if any(ext in f for ext in [".safetensors", ".bin"]) and "adapter" not in f]
         for file in weight_files:
             logger.info(f"  ✓ {file}")
 

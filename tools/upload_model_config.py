@@ -10,11 +10,11 @@ Usage:
 import json
 import sys
 from pathlib import Path
+
 from huggingface_hub import HfApi, upload_file
 from loguru import logger
 
 from llm_engineering import settings
-
 
 # Standard Llama 3.1 8B configuration
 LLAMA_3_1_8B_CONFIG = {
@@ -164,7 +164,7 @@ def main():
         success = upload_config_to_hf(model_name, config, settings.HUGGINGFACE_ACCESS_TOKEN)
 
         if success:
-            logger.success(f"✅ Config uploaded successfully!")
+            logger.success("✅ Config uploaded successfully!")
             logger.info(f"You can now use {model_name} in the evaluation pipeline.")
         else:
             logger.error("Failed to upload config.")
@@ -181,17 +181,17 @@ def main():
         twin_models = [m for m in models if "TwinLlama" in m]
 
         if twin_models:
-            logger.info(f"\nYour TwinLlama models:")
+            logger.info("\nYour TwinLlama models:")
             for i, model_id in enumerate(twin_models, 1):
                 logger.info(f"  {i}. {model_id}")
 
-            logger.info(f"\nTo upload config to a specific model, run:")
+            logger.info("\nTo upload config to a specific model, run:")
             logger.info(f"  python tools/upload_model_config.py --model-name {twin_models[0]}")
-            logger.info(f"\nOr upload to all TwinLlama models:")
-            logger.info(f"  python tools/upload_model_config.py --all")
+            logger.info("\nOr upload to all TwinLlama models:")
+            logger.info("  python tools/upload_model_config.py --all")
         else:
             logger.info(f"Found {len(models)} models, but none are TwinLlama models.")
-            logger.info(f"List of all models:")
+            logger.info("List of all models:")
             for i, model_id in enumerate(models[:10], 1):
                 logger.info(f"  {i}. {model_id}")
             if len(models) > 10:

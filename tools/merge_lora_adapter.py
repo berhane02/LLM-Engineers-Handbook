@@ -5,12 +5,12 @@ This creates a full model that vLLM can load.
 """
 
 import sys
-import torch
-from pathlib import Path
-from huggingface_hub import HfApi, snapshot_download, upload_folder, login
-from loguru import logger
-import shutil
 import tempfile
+from pathlib import Path
+
+import torch
+from huggingface_hub import HfApi, login, snapshot_download, upload_folder
+from loguru import logger
 
 from llm_engineering import settings
 
@@ -80,8 +80,8 @@ def main():
             logger.info("Loading models...")
 
             # Load base model
-            from transformers import LlamaForCausalLM, LlamaTokenizer
             from peft import PeftModel
+            from transformers import LlamaForCausalLM, LlamaTokenizer
 
             base_model = LlamaForCausalLM.from_pretrained(
                 str(base_dir),
