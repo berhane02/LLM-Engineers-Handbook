@@ -315,7 +315,7 @@ def finetune(
             return {"text": text}
 
         dataset1 = load_dataset(f"{dataset_huggingface_workspace}/llmtwin", split="train")
-        dataset2 = load_dataset("mlabonne/FineTome-Alpaca-100k", split="train[:10000]")
+        dataset2 = load_dataset("berhaneio/FineTome-Alpaca-100k", split="train[:10000]")
         dataset = concatenate_datasets([dataset1, dataset2])
         if is_dummy:
             try:
@@ -472,7 +472,7 @@ def save_model(model: Any, tokenizer: Any, output_dir: str, push_to_hub: bool = 
             tokenizer.save_pretrained(output_dir)
 
 
-def check_if_huggingface_model_exists(model_id: str, default_value: str = "mlabonne/TwinLlama-3.1-8B") -> str:
+def check_if_huggingface_model_exists(model_id: str, default_value: str = "berhaneio/TwinLlama-3.1-8B") -> str:
     api = HfApi()
 
     try:
@@ -497,8 +497,8 @@ if __name__ == "__main__":
         parser.add_argument("--num_train_epochs", type=int, default=3)
         parser.add_argument("--per_device_train_batch_size", type=int, default=2)
         parser.add_argument("--learning_rate", type=float, default=3e-4)
-        parser.add_argument("--dataset_huggingface_workspace", type=str, default="mlabonne")
-        parser.add_argument("--model_output_huggingface_workspace", type=str, default="mlabonne")
+        parser.add_argument("--dataset_huggingface_workspace", type=str, default="berhaneio")
+        parser.add_argument("--model_output_huggingface_workspace", type=str, default="berhaneio")
         parser.add_argument("--is_dummy", type=bool, default=False, help="Flag to reduce the dataset size for testing")
         parser.add_argument(
             "--finetuning_type",

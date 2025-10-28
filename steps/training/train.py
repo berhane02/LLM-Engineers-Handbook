@@ -9,7 +9,7 @@ def train(
     num_train_epochs: int,
     per_device_train_batch_size: int,
     learning_rate: float,
-    dataset_huggingface_workspace: str = "mlabonne",
+    dataset_huggingface_workspace: str = "berhaneio",
     is_dummy: bool = False,
 ) -> None:
     run_finetuning_on_sagemaker(
